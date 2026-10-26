@@ -1,179 +1,107 @@
-import gradio as gr
+import streamlit as st
+import pandas as pd
+import numpy as np
 import joblib
 
 
-joblib.dump(loaded_model, "population_model.joblib")
-joblib.dump(saved_features, "population_features.joblib")
+# Load trained model and feature columns
+model = joblib.load("best_population_model.pkl")
+feature_cols = joblib.load("population_feature_columns.pkl")
 
 
-loaded_model = joblib.load("population_model.joblib")
-saved_features = joblib.load("population_features.joblib")
+# Page configuration
+st.set_page_config(
+    page_title="World Population Predictor",
+    page_icon="🌍",
+    layout="centered"
+)
 
-def predict_population(
-    Density_P_Km2,
-    Land_Area_Km2,
-    Fert_Rate,
-    Median_Age,
-    Urban_Pop_Percent,
-    Migrants_Net,
-    Yearly_Change_Percent
-):
-    new_country = pd.DataFrame([[
-        Density_P_Km2,
-        Land_Area_Km2,
-        Fert_Rate,
-        Median_Age,
-        Urban_Pop_Percent,
-        Migrants_Net,
-        Yearly_Change_Percent
-    ]], columns=saved_features)
 
-    predicted_log_population = loaded_model.predict(new_country)[0]
+# Title
+st.title("🌍 World Population Predictor")
+
+st.write(
+    "Predict a country's population using demographic and "
+    "geographic characteristics."
+)
+
+
+# Input section
+st.subheader("Enter Country Information")
+
+
+density = st.number_input(
+    "Population Density (people/km²)",
+    min_value=0.0,
+    value=100.0
+)
+
+land_area = st.number_input(
+    "Land Area (km²)",
+    min_value=1.0,
+    value=100000.0
+)
+
+fertility = st.number_input(
+    "Fertility Rate",
+    min_value=0.0,
+    value=2.0
+)
+
+median_age = st.number_input(
+    "Median Age",
+    min_value=0.0,
+    max_value=100.0,
+    value=30.0
+)
+
+urban_population = st.number_input(
+    "Urban Population (%)",
+    min_value=0.0,
+    max_value=100.0,
+    value=50.0
+)
+
+migrants = st.number_input(
+    "Net Migrants",
+    value=0.0
+)
+
+yearly_change = st.number_input(
+    "Yearly Population Change (%)",
+    value=1.0
+)
+
+
+# Prediction button
+if st.button("🌍 Predict Population"):
+
+    input_data = pd.DataFrame(
+        [[
+            density,
+            land_area,
+            fertility,
+            median_age,
+            urban_population,
+            migrants,
+            yearly_change
+        ]],
+        columns=feature_cols
+    )
+
+    # Predict log population
+    predicted_log_population = model.predict(input_data)[0]
+
+    # Convert back from log scale
     predicted_population = np.exp(predicted_log_population)
 
-    return f"Predicted Population: {predicted_population:,.0f}"
-
-import gradio as gr
-
-def predict_population_ui(
-    density, land_area, fertility, median_age,
-    urban_pop, migrants, yearly_change
-):
-    result = predict_population(
-        density, land_area, fertility, median_age,
-        urban_pop, migrants, yearly_change
-    )
-    return result
-
-custom_css = """
-.gradio-container {
-    max-width: 1100px !important;
-    margin: auto !important;
-}
-#main-title {
-    text-align: center;
-    margin-bottom: 5px;
-}
-#subtitle {
-    text-align: center;
-    color: #64748b;
-    margin-bottom: 25px;
-}
-.input-card, .output-card {
-    border-radius: 14px !important;
-    border: 1px solid #dbe4e8 !important;
-    padding: 18px !important;
-}
-#predict-btn {
-    background: #167d68 !important;
-    color: white !important;
-    border-radius: 10px !important;
-}
-#reset-btn {
-    border-radius: 10px !important;
-}
-"""
-
-with gr.Blocks(
-    theme=gr.themes.Soft(
-        primary_hue="emerald",
-        secondary_hue="slate",
-        neutral_hue="slate"
-    ),
-    css=custom_css,
-    title="World Population Predictor"
-) as interface:
-
-    gr.Markdown("# 🌍 World Population Predictor", elem_id="main-title")
-    gr.Markdown(
-        "Estimate a country's population using demographic and geographic data.",
-        elem_id="subtitle"
+    # Display result
+    st.success(
+        f"Predicted Population: {predicted_population:,.0f}"
     )
 
-    with gr.Row():
-        with gr.Column(scale=3):
-            with gr.Group(elem_classes="input-card"):
-                gr.Markdown("### 📊 Country Information")
-                gr.Markdown("Enter the country's demographic details below.")
-
-                with gr.Row():
-                    density = gr.Number(
-                        label="Population Density (people/km²)",
-                        value=100,
-                        minimum=0
-                    )
-                    land_area = gr.Number(
-                        label="Land Area (km²)",
-                        value=100000,
-                        minimum=1
-                    )
-
-                with gr.Row():
-                    fertility = gr.Number(
-                        label="Fertility Rate",
-                        value=2.0,
-                        minimum=0
-                    )
-                    median_age = gr.Number(
-                        label="Median Age",
-                        value=30,
-                        minimum=0,
-                        maximum=100
-                    )
-
-                with gr.Row():
-                    urban_pop = gr.Number(
-                        label="Urban Population (%)",
-                        value=50,
-                        minimum=0,
-                        maximum=100
-                    )
-                    migrants = gr.Number(
-                        label="Net Migrants",
-                        value=0
-                    )
-
-                yearly_change = gr.Number(
-                    label="Yearly Population Change (%)",
-                    value=1.0
-                )
-
-                with gr.Row():
-                    predict_btn = gr.Button(
-                        "🌍 Predict Population",
-                        variant="primary",
-                        elem_id="predict-btn"
-                    )
-                    reset_btn = gr.Button(
-                        "↻ Reset Values",
-                        elem_id="reset-btn"
-                    )
-
-        with gr.Column(scale=2):
-            with gr.Group(elem_classes="output-card"):
-                gr.Markdown("### 🎯 Prediction Result")
-                result = gr.Textbox(
-                    label="Estimated Population",
-                    lines=3,
-                    interactive=False,
-                    placeholder="Your prediction will appear here."
-                )
-
-    input_components = [
-        density, land_area, fertility, median_age,
-        urban_pop, migrants, yearly_change
-    ]
-
-    predict_btn.click(
-        fn=predict_population_ui,
-        inputs=input_components,
-        outputs=result
+    st.metric(
+        "Estimated Population",
+        f"{predicted_population:,.0f}"
     )
-
-    reset_btn.click(
-        fn=lambda: [100, 100000, 2.0, 30, 50, 0, 1.0, ""],
-        inputs=[],
-        outputs=input_components + [result]
-    )
-
 interface.launch()
